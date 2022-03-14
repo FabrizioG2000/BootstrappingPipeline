@@ -198,7 +198,7 @@ empirical_pval_compute_fn<-function(chromo,cl_folder,cl_file,feature_Grange,fn_r
 }
 
 #-----------------------------------------
-cl_folder<-"./data/GRanges/BHiCect_Grange/H1/"
+cl_folder<-"./data/Cluster_data/GRange/"
 cl_file<-"_BHiCect_cl.Rda"
 feature_file<-"./data/GRanges/CAGE_union_H1_Grange.Rda"
 out_file<-"./data/pval_tbl/CAGE_union_H1_pval_tbl.Rda"
@@ -208,12 +208,12 @@ tmp_obj<-names(mget(load(feature_file)))
 rm(list=tmp_obj)
 rm(tmp_obj)
 
-hg19_coord <- read_delim("~/Documents/multires_bhicect/data/hg19.genome", 
+hg19_coord <- read_delim("./data/Annotation_data/hg19.genome", 
                          "\t", escape_double = FALSE, col_names = FALSE, 
                          trim_ws = TRUE)
 names(hg19_coord)<-c("chrom","size")
 
-fn_repo<-"~/Documents/multires_bhicect/data/epi_data/fn_BED/"
+fn_repo<-"./data/Annotation_data/fn_BED/"
 
 txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
 

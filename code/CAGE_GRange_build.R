@@ -22,8 +22,8 @@ build_GRange_fn<-function(CAGE_file){
 
 #-----------------------------------------
 
-CAGE_file<-"./data/CAGE_union_coord_H1_tbl.Rda"
-out_file<-"./data/GRanges/CAGE_union_H1_Grange.Rda"
+CAGE_file<-"./data/CAGE_union_coord_HMEC_tbl.Rda"
+out_file<-"./data/GRanges/CAGE_union_HMEC_Grange.Rda"
 
 cage_chr_Grange<-build_GRange_fn(CAGE_file)
 save(cage_chr_Grange,file=out_file)
