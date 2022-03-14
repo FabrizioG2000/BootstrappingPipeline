@@ -8,11 +8,11 @@ res_num <- c(1e6,5e5,1e5,5e4,1e4,5e3)
 names(res_num)<-res_set
 #--------------------------------------------------------------------
 res_file<-"./data/Cluster_data/Raw/spec_res/"
-out_folder<-"./data/Cluster_data/GRange/"
+out_folder<-"./data/Cluster_data/GRange/HMEC/"
 
 chr_set<-unlist(lapply(strsplit(grep("chr",list.files(res_file),value=T),split="_"),'[',1))
 for (chromo in chr_set){
-  print(chromo)
+  message(chromo)
   load(paste0(res_file,chromo,"_spec_res.Rda"))
   chr_cl_tbl<-tibble(chr=chromo,cl=names(chr_spec_res$cl_member),bins=chr_spec_res$cl_member)
   chr_cl_tbl<-chr_cl_tbl %>% mutate(res=map_chr(cl,function(x){
