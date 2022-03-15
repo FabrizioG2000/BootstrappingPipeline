@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 BootstrappingPipeline.Rproj
+.vscode/
+.lintr
