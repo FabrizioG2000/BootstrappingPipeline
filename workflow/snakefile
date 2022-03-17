@@ -1,0 +1,8 @@
+rule wrap_features:
+    input:
+        script = "code/wrap_features.R",
+        data   = "data/feature/feature_in.Rda"
+    output:
+        name = "data/feature/feature_wrapped.Rda"
+    shell:
+        "Rscript {input.script} --data {input.data} --out {output.name}"
