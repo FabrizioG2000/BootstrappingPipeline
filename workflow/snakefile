@@ -5,4 +5,11 @@ rule wrap_features:
     output:
         name = "data/feature/feature_wrapped.Rda"
     shell:
-        "Rscript {input.script} --data {input.data} --out {output.name}"
+        "Rscript {input.script} --data {input.data} --output {output.name}"
+
+
+rule wrap_clusters:
+    input:
+        script = "code/wrap_clusters.R",
+    shell:
+        "Rscript {input.script} --input data/clusters/raw/ --output data/cluster/wrapped/ --pattern %_spec_res.Rda --save %_spec_res_wrapped.Rda"

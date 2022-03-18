@@ -9,7 +9,7 @@ option_list <- list(
         type = "character", default = NULL,
         help = "The input dataset [Required]", metavar = "character"
     ),
-    make_option(c("-o", "--out"),
+    make_option(c("-o", "--output"),
         type = "character", default = NULL,
         help = "The output file name. The path is relative to the directory of the input. [Required]", metavar = "character"
     )
@@ -20,7 +20,7 @@ opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
 # Chacking that the input file has been passed
-if (is.null(opt$data) | is.null(opt$out)) {
+if (is.null(opt$data) | is.null(opt$output)) {
     stop("Please specify an input and an output file.")
 }
 
@@ -70,7 +70,7 @@ wrap_features_fn <- function(input_file) {
 input_filepath <- opt$data
 
 # Parsing the output path from the provided argument
-output_filepath <- opt$out
+output_filepath <- opt$output
 
 # Running the function
 wrapped_features <- wrap_features_fn(input_filepath)
