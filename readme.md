@@ -7,7 +7,7 @@ This is a pipeline to calculate the p-value of the association between particula
 ```mermaid
   graph LR;
     A[Raw Features] --wrap_features.R--> B[Wrapped Features]
-    B --count_annotations--> E[Annotation Counts] 
+    B --count_annotations.R--> E[Annotation Counts] 
     C[Clusters] --wrap_clusters.R--> D[Wrapped Clusters]
     D --> F[Compute P-Value]
     B --> F

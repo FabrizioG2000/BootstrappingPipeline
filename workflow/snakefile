@@ -1,15 +1,59 @@
+CHROMOSOMES = []
+CONDITIONS = glob_wildcards("data/cluster/raw/{chromosome}_spec_res.Rda").chromosome
+
+# Wraps the given features into a GenomicRange object to speed up further computations
 rule wrap_features:
     input:
+        #The script for wrapping the features
         script = "code/wrap_features.R",
+
+        # The features to wrap in a GenomicRange object
         data   = "data/feature/feature_in.Rda"
     output:
         name = "data/feature/feature_wrapped.Rda"
+
     shell:
         "Rscript {input.script} --data {input.data} --output {output.name}"
 
+# Counts the number of features for each annotation category.
+rule count_annotations:
+    input: 
+        script = "code/count_annotations.R",
 
+        # The wrapped features to count the annotation one.
+        data = "data/feature/feature_wrapped.Rda",
+        annotation = "data/annotation/fn_BED/"
+    output:         
+        name = "data/feature/annotations.tsv"
+    shell:
+        "Rscript {input.script} --input {input.data} --annotation {input.annotation} --output {output.name}"
+
+# Wraps the clusters into GenomicRange objects to speed up further computations
 rule wrap_clusters:
     input:
         script = "code/wrap_clusters.R",
+        raw_folder = "data/cluster/raw/",
+    
+    message:
+        "Wrapping clusters for chromosome {wildcards.chromosome}"
+    
+    output:
+        clusters = "data/cluster/wrapped/{chromosome}_wrapped.Rda"
     shell:
-        "Rscript {input.script} --input data/clusters/raw/ --output data/cluster/wrapped/ --pattern %_spec_res.Rda --save %_spec_res_wrapped.Rda"
+        "Rscript {input.script} --input data/clusters/raw/ --output data/cluster/wrapped/ --pattern %_spec_res.Rda --save %_wrapped.Rda"
+
+annotation_path = "data/feature/annotations.tsv",
+
+rule compute_pvalue:
+    input: 
+        script = "code/compute_pvalue_future.R",
+        clusters = "data/cluster/wrapped/",
+        genome = "data/annotation/hg19.genome",
+        data = "data/feature/feature_wrapped.Rda",
+        #clusters_wd = expand("data/cluster/wrapped/{chromosome}_wrapped.Rda", chromosome = CONDITIONS),
+   
+        function_path = "data/annotation/fn_BED/"
+    output:
+        name =  "data/p_val_tbl.Rda"
+    shell:
+        "Rscript {input.script} --feature {input.data} --clusters {input.clusters} --annotations {annotation_path} --suffix _wrapped.Rda --genome {input.genome} --function_path {input.function_path} --output {output.name} --workers 3"

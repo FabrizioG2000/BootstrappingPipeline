@@ -1,65 +1,108 @@
 # Empirical p-value process re-factored as functions
-library(tidyverse)
-library(GenomicRanges)
-library(valr)
-library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-library(crayon)
-library(pbapply)
-library(future)
-library(future.apply)
+suppressMessages(library(tidyverse))
+suppressMessages(library(GenomicRanges))
+suppressMessages(library(valr))
+suppressMessages(library(crayon))
+suppressMessages(library(future))
+suppressMessages(library(future.apply))
+library(optparse)
+
+print("Imported required Libraries.")
 
 source("code/common.R")
 
-
+# R-Specific stuff
 options(scipen = 999999999)
 res_set <- c("1Mb", "500kb", "100kb", "50kb", "10kb", "5kb")
 res_num <- c(1e6, 5e5, 1e5, 5e4, 1e4, 5e3)
 names(res_num) <- res_set
 
-WORKERS_NUM <- 3
+# the parameters which will be updated to work with optparse
+clusters_folder <- "./data/cluster/wrapped/"
+annotations_counts_path <- "./data/feature/annotations.tsv"
+clusters_file_suffix <- "_wrapped.Rda"
+feature_file <- "./data/feature/feature_wrapped.Rda"
+out_file <- "./data/pval_tbl.Rda"
+genome_filepath <- "./data/annotation/hg19.genome"
+function_path <- "./data/annotation/fn_BED/"
 
-#-----------------------------------------
-## Utility functions
-feature_annotation_fn <- function(txdb, chr_feature_Grange, fn_file) {
-    peakAnno <- annotatePeak(chr_feature_Grange, tssRegion = c(-3000, 3000), TxDb = txdb, annoDb = "org.Hs.eg.db", verbose = F)
+option_list = c(
+    make_option(c("-d", "--clusters"),
+        type = "character", default = NULL,
+        help = "The folder containing the clusters", metavar = "character"
+    ),
 
-    rn_annotation <- sample(peakAnno@annoStat$Feature, size = length(chr_feature_Grange), prob = peakAnno@annoStat$Frequency / 100, replace = T)
-    # check number of peaks from that category
-    n5 <- length(grep("5'", as.character(rn_annotation)))
-    n3 <- length(grep("3'", as.character(rn_annotation)))
-    nexon <- length(grep("Exon", as.character(rn_annotation)))
-    nintron <- length(grep("Intron", as.character(rn_annotation)))
-    n1kb <- length(grep("1kb", as.character(rn_annotation)))
-    n2kb <- length(grep("2kb", as.character(rn_annotation)))
-    n3kb <- length(grep("3kb", as.character(rn_annotation)))
-    ndown <- length(grep("Down", as.character(rn_annotation)))
-    ninter <- length(grep("Inter", as.character(rn_annotation)))
-    n_vec <- c(n3, n5, ndown, nexon, ninter, nintron, n1kb, n2kb, n3kb)
-    names(n_vec) <- fn_file
-    rm(ChIPseekerEnv, envir = globalenv())
-    rm(n5, n3, nexon, nintron, n1kb, n2kb, n3kb, ndown, ninter)
-    n_vec <- n_vec[n_vec > 0]
-    return(n_vec)
-}
+    make_option(
+        c("-a", "--annotations"),
+        type = "character", default = NULL,
+        help = "The path to the annotations counts file", metavar = "character"
+    ),
 
-rn_feature_GRange_build_fn <- function(n_vec, fn_bed_l, hg19_coord, tmp_cage_tbl, fn_file) {
+    make_option(
+        c("-s", "--suffix"),
+        type = "character", default = NULL,
+        help = "The suffix of the clusters files", metavar = "character"
+    ),
+    make_option(
+        c("-f", "--feature"),
+        type = "character", default = NULL,
+        help = "The path to the feature file", metavar = "character"
+    ),
+    make_option(
+        c("-g", "--genome"),
+        type = "character", default = NULL,
+        help = "The path to the genome file", metavar = "character"
+    ),
+    make_option(
+        c("-u", "--function_path"),
+        type = "character", default = NULL,
+        help = "The path to the function files", metavar = "character"
+    ),
+    make_option(
+        c("-o", "--output"),
+        type = "character", default = NULL,
+        help = "The path to the output file", metavar = "character"
+    ),
+    make_option(
+        c("-w", "--workers"),
+        type = "integer", default = NULL,
+        help = "The number of workers to dispatch the work on", metavar = "integer"
+    )
+)
+
+# Creating the options to parse the arguments
+opt <- parse_args(OptionParser(option_list = option_list))
+
+# Parsing the arguments from the console 
+clusters_folder <- opt$clusters
+annotations_counts_path <- opt$annotations
+clusters_file_suffix <- opt$suffix
+feature_file <- opt$feature
+out_file <- opt$output
+genome_filepath <- opt$genome
+function_path <- opt$function_path
+
+# the number of workers to dispatch the work on.
+WORKERS_NUM <- opt$workers
+
+rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tmp_cage_tbl, fn_file) {
 
     # The environment from the function
     fn_env <- environment()
 
     # The empty vector of functions
-    rn_fn_coord_l <- vector("list", length(n_vec))
-    names(rn_fn_coord_l) <- names(n_vec)
+    rn_fn_coord_l <- vector("list", length(chromo_counts))
+    rn_fn_coord_l
+    names(rn_fn_coord_l) <- names(chromo_counts)
 
-    # looping over the features names
-    f <- names(n_vec)[1]
-    for (f in names(n_vec)) {
-
+    for (f in names(chromo_counts)) {
         # How many feature do we need to generate?
-        tmp_n <- n_vec[f]
-        if (f == fn_file[5]) {
-            plan(multisession, workers = WORKERS_NUM)
+        tmp_n <- chromo_counts[[f]]
 
+
+        if (f == fn_file[5]) {
+            future::plan(future::multisession, workers = WORKERS_NUM)
+            
             # applies from 1 to 100 to
             rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = T, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
                 # Try pattern to not abort at the shuffling step
@@ -72,12 +115,12 @@ rn_feature_GRange_build_fn <- function(n_vec, fn_bed_l, hg19_coord, tmp_cage_tbl
                 return(rn_pol)
             })
 
-            plan(sequential)
+            future::plan(future::sequential)
         }
 
         # If the feature is not chr22_inter_no
         if (f != fn_file[5]) {
-            plan(multisession, workers = WORKERS_NUM)
+            future::plan(future::multisession, workers = WORKERS_NUM)
 
             # Create a list of 100 random situations
             rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = T, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
@@ -93,13 +136,13 @@ rn_feature_GRange_build_fn <- function(n_vec, fn_bed_l, hg19_coord, tmp_cage_tbl
                 return(rn_pol)
             })
 
-            plan(sequential)
+            future::plan(future::sequential)
 
             # Collect the successful shuffling by eliminating the shuffles producing try-error objects
             rn_fn_coord_l[[f]] <- rn_fn_coord_l[[f]][!(unlist(lapply(rn_fn_coord_l[[f]], function(x) any(class(x) %in% "try-error"))))]
         }
 
-        message(paste0("Finished ", f, " shuffling"))
+        cat("-\t Finished shuffling ", crayon::blue(f), " features", "\n")
     }
 
     warnings()
@@ -111,18 +154,18 @@ rn_feature_GRange_build_fn <- function(n_vec, fn_bed_l, hg19_coord, tmp_cage_tbl
     # looping over 10 and joining the results from the random sampling of one of the features.
     # For example, loop over chr22_inter_no, chr22_inter_no_1, chr22_inter_no_2, ..., chr22_inter_no_10
     # And join the results obtained from sampling one of the 100 available chr22_inter_no features
-    plan(multisession, workers = WORKERS_NUM)
+    future::plan(future::multisession, workers = WORKERS_NUM)
     rn_peak_coord_tbl_l <- future_lapply(1:bootstrap_count, future.seed = T, future.envir = fn_env, future.packages = c("dplyr"), function(x) {
-        return(do.call(bind_rows, lapply(rn_fn_coord_l, function(f) f[[sample(1:length(f), 1)]])))
+        return(do.call(dplyr::bind_rows, lapply(rn_fn_coord_l, function(f) f[[sample(1:length(f), 1)]])))
     })
-    plan(sequential)
+    future::plan(future::sequential)
 
 
     # Remove the list of random functional features from this environment
     rm(rn_fn_coord_l, envir = fn_env)
 
     # convert the list of random functional features into GRanges
-    rn_Grange_l <- pblapply(rn_peak_coord_tbl_l, function(x) {
+    rn_Grange_l <- lapply(rn_peak_coord_tbl_l, function(x) {
         rnp_Grange <- GRanges(
             seqnames = x$chrom,
             ranges = IRanges(
@@ -142,23 +185,23 @@ rn_feature_GRange_build_fn <- function(n_vec, fn_bed_l, hg19_coord, tmp_cage_tbl
 
 ## The main function
 # chromo is the chromosome name, so for example chr1
-# cl_folder is the folder where the clusters are contained
-# cl_file is the suffix of the cluster file
-# feature_GRange is the GRange object of the features
-# fn_repo is "../data/annotation/", the folder where the annotation files are
-empirical_pval_compute_fn <- function(chromo, cl_folder, cl_file, feature_Grange, fn_repo, txdb, hg19_coord) {
+# clusters_folder is the folder where the clusters are contained
+# clusters_file_suffix is the suffix of the cluster file
+# wrapped_features is the GRange object of the features
+# function_path is "../data/annotation/", the folder where the annotation files are
+empirical_pval_compute_fn <- function(chromo, clusters_folder, clusters_file_suffix, wrapped_features, function_path, hg19_coord, annotations_counts) {
 
     # The main environment of the function
     main_fn_env <- environment()
 
     # the features of this chromosome
-    chr_feature_Grange <- feature_Grange[seqnames(feature_Grange) == chromo]
+    chr_wrapped_features <- wrapped_features[seqnames(wrapped_features) == chromo]
 
     # Logging the start of the bootstrappinf
-    cat(green(chromo), " Bootstrapping started \n")
+    cat("Started bootstrapping for chromosome ", crayon::green(chromo), "\n")
 
     # The folder containing the annotations about this chromosome: "../data/annotation/fn_BED/chr1/"
-    fn_folder <- paste0(fn_repo, chromo, "/")
+    fn_folder <- paste0(function_path, chromo, "/")
 
     # All the bed files for this chromosome
     fn_file <- grep("BED$", list.files(fn_folder), value = T)
@@ -166,44 +209,40 @@ empirical_pval_compute_fn <- function(chromo, cl_folder, cl_file, feature_Grange
     # Parsing all the bed files
     # The bed files are parsed and put in a dictionary where the key is the file name and the value is the bed file
     fn_bed_l <- lapply(fn_file, function(f) {
-        read_bed(paste0(fn_folder, f), n_fields = 3)
+
+        # Just read the chromosome name, the start and the end
+        valr::read_bed(paste0(fn_folder, f), n_fields = 3)
     })
     names(fn_bed_l) <- fn_file
 
-    # Copying the txdb and retaining only the rows relative to this chromosome
-    txdb_chr <- txdb
-    seqlevels(txdb_chr) <- chromo
+    # Select the row where chromosome is chromo
+    chromo_counts <- annotation_counts[annotation_counts$chr == chromo, ]
+    
 
-    # Logging that the annotation has started
-    cat(green(chromo), " feature annotation Started \n")
-
-    # Re-importing ChIPseeker
-    suppressMessages(library(ChIPseeker))
-    message("Imported ChIPseeker")
-
-    # The number of features for each type
-    n_vec <- feature_annotation_fn(txdb_chr, chr_feature_Grange, fn_file)
+    # Keep only the element starting from the second one (remove chr)
+    chromo_counts <- chromo_counts[, 2:ncol(chromo_counts)]
+    chromo_counts
+    
+    # Replace X with chromo in the names of chromo_counts (for some reason while importing the column names)
+    # switch from utr3.BED to chr1_utr3.BED
+    names(chromo_counts) <- gsub("j", paste0(chromo, "_"), names(chromo_counts))
 
     # Loading the clusters for this chromosome
-    cl_chr_tbl <- load_data((paste0(cl_folder, chromo, cl_file)))
+    cl_chr_tbl <- load_data((paste0(clusters_folder, chromo, clusters_file_suffix)))
 
-    # Removing ChIPseeker package
-    detach("package:ChIPseeker", unload = TRUE)
-    message("Removed ChIPseeker")
-
-    # Logging that the GRanges have started being built
-    cat(green(chromo), " Counting overlaps \n")
+    # Logging that the counting of the observed overlaps has started.
+    cat("Started counting observed overlaps for chromosome ", crayon::green(chromo), "\n")
 
     # table collecting the observed CAGE-peak coordinates
     # counting the number of overlaps between the features and the clusters
     # looping over each list of GRanges for each cluster
-    plan(multisession, workers = WORKERS_NUM)
-    cl_inter_vec <- unlist(future_lapply(cl_chr_tbl$GRange, future.packages = c("GenomicRanges"), function(x) {
+    future::plan(future::multisession, workers = WORKERS_NUM)
+    cl_inter_vec <- unlist(future_lapply(cl_chr_tbl$GRange, future.envir = main_fn_env, future.packages = c("GenomicRanges"), function(x) {
 
         # Counting the overlaps between a given feature and a cluster
-        sum(countOverlaps(x, chr_feature_Grange))
+        sum(IRanges::countOverlaps(x, chr_wrapped_features))
     }))
-    plan(sequential)
+    future::plan(future::sequential)
 
     # Adds a column containing the number of overlaps to the cluster table and filters for the clusters having more than zero overlap
     cl_chr_tbl <- cl_chr_tbl %>%
@@ -214,29 +253,30 @@ empirical_pval_compute_fn <- function(chromo, cl_folder, cl_file, feature_Grange
     cl_list <- GRangesList(cl_chr_tbl$GRange)
 
     # Create this tmp_cage_tbl by:
-    # -1) Converting the chr_feature_Grange to a tibbble
+    # -1) Converting the chr_wrapped_features to a tibbble
     # -2) Selecting only the seqname, start and end columns
     # -3) Renaming the column seqname to chrom
-    tmp_cage_tbl <- chr_feature_Grange %>%
+    tmp_cage_tbl <- chr_wrapped_features %>%
         as_tibble() %>%
         dplyr::select(seqnames, start, end) %>%
         dplyr::rename(chrom = seqnames)
 
-    cat(green(chromo), " building random feature coordinates \n")
+    # Logging that the generation of the random features
+    cat("Started generating random features for chromosome ", crayon::green(chromo), "\n")
 
     # Building the effective random coordinates on which the p-value will be computed
-    rn_Grange_l <- rn_feature_GRange_build_fn(n_vec, fn_bed_l, hg19_coord, tmp_cage_tbl, fn_file)
+    rn_Grange_l <- rn_wrapped_features_build_fn(chromo_counts, fn_bed_l, hg19_coord, tmp_cage_tbl, fn_file)
 
-    # Logging the computation of the pvalues.
-    cat(green(chromo), " computing empirical p-value \n")
+    # Logging the started of the p-value computation
+    cat("Started computing p-values for chromosome ", crayon::green(chromo), "\n")
 
     # counting the overlaps between the clusters and the newly created random features
     # The resulting vector will be a list of 10 (number of bootstrap) lists of overlaps count for each cluster.
-    plan(multisession, workers = WORKERS_NUM)
+    future::plan(future::multisession, workers = WORKERS_NUM)
     rn_pval_l <- future_lapply(rn_Grange_l, future.packages = c("GenomicRanges"), function(x) {
-        countOverlaps(cl_list, x)
+        IRanges::countOverlaps(cl_list, x)
     })
-    plan(sequential)
+    future::plan(future::sequential)
 
     # Removing the useless granges.
     rm(rn_Grange_l)
@@ -263,34 +303,32 @@ empirical_pval_compute_fn <- function(chromo, cl_folder, cl_file, feature_Grange
     return(cl_chr_tbl %>% mutate(emp.pval = cl_emp_pval))
 }
 
-#-----------------------------------------
-cl_folder <- "./data/cluster/wrapped/"
-cl_file <- "_wrapped.Rda"
-feature_file <- "./data/feature/feature_wrapped.Rda"
-out_file <- "./data/pval_tbl.Rda"
-
 # The features in the shape of a GRange object
-feature_Grange <- load_data(feature_file)
+wrapped_features <- load_data(feature_file)
 
-hg19_coord <- read_delim("./data/annotation/hg19.genome",
+# the coordinates of the h19 genome (chromosome names and sizes)
+hg19_coord <- read_delim(genome_filepath,
     "\t",
     escape_double = FALSE, col_names = FALSE,
-    trim_ws = TRUE
+    trim_ws = TRUE,
+    show_col_types = FALSE # to quiet the mesage
 )
 names(hg19_coord) <- c("chrom", "size")
 
-fn_repo <- "./data/annotation/fn_BED/"
+chr_set <- list.files(function_path)
+annotation_counts <- read.csv(annotations_counts_path, header = T, stringsAsFactors = F, sep = "\t")
 
-txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
-
-chr_set <- list.files(fn_repo)
-
+# Computing the p-values for all the chromosomes.
 cl_chr_emp_pval_l <- lapply(chr_set, function(chromo) {
-    cl_chr_tbl <- empirical_pval_compute_fn(chromo, cl_folder, cl_file, feature_Grange, fn_repo, txdb, hg19_coord)
-    seqlevels(txdb) <- seqlevels0(txdb)
-
+    cl_chr_tbl <- empirical_pval_compute_fn(chromo, clusters_folder, clusters_file_suffix, wrapped_features, function_path, hg19_coord, annotation_counts)
     return(cl_chr_tbl)
 })
 
 cl_chr_emp_pval_tbl <- do.call(bind_rows, cl_chr_emp_pval_l)
-save(cl_chr_emp_pval_tbl, file = out_file)
+
+#Save the table as a tsv
+# Drop the GRange and bins columns
+cl_chr_emp_pval_tbl <- cl_chr_emp_pval_tbl %>%
+    dplyr::select(chr, cl, feature_n, emp.pval)
+
+write.table(cl_chr_emp_pval_tbl, file = paste0("./data/", "p_value_table.tsv"), sep = "\t", row.names = F, col.names = T)
