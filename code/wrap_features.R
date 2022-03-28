@@ -3,6 +3,9 @@
 # we want to give the user the feedback immediately
 library("optparse")
 
+# For load_data
+source("code/common.R")
+
 # The arguments
 option_list <- list(
     make_option(c("-d", "--data"),
@@ -45,26 +48,22 @@ names(res_num) <- res_set
 wrap_features_fn <- function(input_file) {
 
   # Load the data from the CAGE_file as an object called cage_coord_tbl
-  cage_coord_tbl <- get(base::load(input_file))
-  tmp_obj <- names(mget(base::load(input_file)))
-  rm(list = tmp_obj)
-  rm(tmp_obj)
+  features_table <- load_data(input_file)
 
   # Filtering the dataframe removing the rows with missing values in the field "start"
-  cage_coord_tbl <- cage_coord_tbl %>% filter(!(is.na(start)))
+  features_table <- features_table %>% filter(!(is.na(start)))
 
   # Converting the data to genomic ranges
-  cage_chr_Grange <- GRanges(
-    seqnames = cage_coord_tbl$chr,
+  features_grange <- GRanges(
+    seqnames = features_table$chr,
     ranges = IRanges(
-      start = as.numeric(cage_coord_tbl$start),
-      end = as.numeric(cage_coord_tbl$end)
+      start = as.numeric(features_table$start),
+      end = as.numeric(features_table$end)
     )
   )
 
-  return(cage_chr_Grange)
+  return(features_grange)
 }
-
 
 # The input file, read from the arguments
 input_filepath <- opt$data

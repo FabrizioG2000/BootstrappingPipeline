@@ -99,7 +99,6 @@ chr_set <- (lapply(list.files(raw_cluster_folder), function(f) {
 }))
 
 if (length(chr_set) > 0) {
-  
   # Logging the number of chromosomes found
   message(blue(paste0("Found ", length(chr_set), " chromosomes.")))
 } else {
