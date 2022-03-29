@@ -1,5 +1,4 @@
-CHROMOSOMES = []
-CONDITIONS = glob_wildcards("data/cluster/raw/{chromosome}_spec_res.Rda").chromosome
+import os
 
 # Wraps the given features into a GenomicRange object to speed up further computations
 rule wrap_features:
@@ -28,19 +27,15 @@ rule count_annotations:
     shell:
         "Rscript {input.script} --input {input.data} --annotation {input.annotation} --output {output.name}"
 
-# Wraps the clusters into GenomicRange objects to speed up further computations
+# Wraps the raw cluster files into genomicranges objects.
 rule wrap_clusters:
     input:
         script = "code/wrap_clusters.R",
-        raw_folder = "data/cluster/raw/",
-    
-    message:
-        "Wrapping clusters for chromosome {wildcards.chromosome}"
-    
+        raw_folder = "data/cluster/raw/"
     output:
-        clusters = "data/cluster/wrapped/{chromosome}_wrapped.Rda"
+        out_folder = directory("data/cluster/wrapped/")
     shell:
-        "Rscript {input.script} --input data/clusters/raw/ --output data/cluster/wrapped/ --pattern %_spec_res.Rda --save %_wrapped.Rda"
+        "Rscript {input.script} --input {input.raw_folder} --output {output.out_folder}"
 
 annotation_path = "data/feature/annotations.tsv",
 
@@ -50,9 +45,9 @@ rule compute_pvalue:
         clusters = "data/cluster/wrapped/",
         genome = "data/annotation/hg19.genome",
         data = "data/feature/feature_wrapped.Rda",
-        #clusters_wd = expand("data/cluster/wrapped/{chromosome}_wrapped.Rda", chromosome = CONDITIONS),
    
         function_path = "data/annotation/fn_BED/"
+    
     output:
         name =  "data/p_val_tbl.Rda"
     shell:
