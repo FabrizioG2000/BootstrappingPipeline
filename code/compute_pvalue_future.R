@@ -37,12 +37,6 @@ option_list = c(
         type = "character", default = NULL,
         help = "The path to the annotations counts file", metavar = "character"
     ),
-
-    make_option(
-        c("-s", "--suffix"),
-        type = "character", default = NULL,
-        help = "The suffix of the clusters files", metavar = "character"
-    ),
     make_option(
         c("-f", "--feature"),
         type = "character", default = NULL,
@@ -65,8 +59,14 @@ option_list = c(
     ),
     make_option(
         c("-w", "--workers"),
-        type = "integer", default = NULL,
+        type = "integer", default = 3,
         help = "The number of workers to dispatch the work on", metavar = "integer"
+    ),
+    #The bootstrap count
+    make_option(
+        c("-b", "--bootstrap"),
+        type = "integer", default = 10,
+        help = "The number of bootstrap iterations", metavar = "integer"
     )
 )
 
@@ -76,11 +76,11 @@ opt <- parse_args(OptionParser(option_list = option_list))
 # Parsing the arguments from the console 
 clusters_folder <- opt$clusters
 annotations_counts_path <- opt$annotations
-clusters_file_suffix <- opt$suffix
 feature_file <- opt$feature
 out_file <- opt$output
 genome_filepath <- opt$genome
 function_path <- opt$function_path
+boostraps <- opt$bootstrap
 
 # the number of workers to dispatch the work on.
 WORKERS_NUM <- opt$workers
@@ -148,7 +148,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
     warnings()
 
     # Assemble these blocks into n rnadom results
-    bootstrap_count <- 10
+    bootstrap_count <- boostraps
 
     # Create 10 random results by:
     # looping over 10 and joining the results from the random sampling of one of the features.
@@ -189,7 +189,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
 # clusters_file_suffix is the suffix of the cluster file
 # wrapped_features is the GRange object of the features
 # function_path is "../data/annotation/", the folder where the annotation files are
-empirical_pval_compute_fn <- function(chromo, clusters_folder, clusters_file_suffix, wrapped_features, function_path, hg19_coord, annotations_counts) {
+empirical_pval_compute_fn <- function(chromo, clusters_folder, wrapped_features, function_path, hg19_coord, annotations_counts) {
 
     # The main environment of the function
     main_fn_env <- environment()
@@ -218,17 +218,27 @@ empirical_pval_compute_fn <- function(chromo, clusters_folder, clusters_file_suf
     # Select the row where chromosome is chromo
     chromo_counts <- annotation_counts[annotation_counts$chr == chromo, ]
     
-
     # Keep only the element starting from the second one (remove chr)
     chromo_counts <- chromo_counts[, 2:ncol(chromo_counts)]
-    chromo_counts
     
     # Replace X with chromo in the names of chromo_counts (for some reason while importing the column names)
     # switch from utr3.BED to chr1_utr3.BED
     names(chromo_counts) <- gsub("j", paste0(chromo, "_"), names(chromo_counts))
 
     # Loading the clusters for this chromosome
-    cl_chr_tbl <- load_data((paste0(clusters_folder, chromo, clusters_file_suffix)))
+    # find the first file in the cluster directory which contains the chromosome name
+    clusters_file <- NA
+    for (f in list.files(clusters_folder)) {
+        if (grepl(paste0(chromo, "_"), f)) {
+            clusters_file <- f
+            break
+        }
+    }
+    if(is.na(clusters_file)) {
+        stop("No clusters file found for chromosome ", chromo)
+    }
+
+    cl_chr_tbl <- load_data(paste0(clusters_folder,"/", clusters_file))
 
     # Logging that the counting of the observed overlaps has started.
     cat("Started counting observed overlaps for chromosome ", crayon::green(chromo), "\n")
@@ -320,7 +330,7 @@ annotation_counts <- read.csv(annotations_counts_path, header = T, stringsAsFact
 
 # Computing the p-values for all the chromosomes.
 cl_chr_emp_pval_l <- lapply(chr_set, function(chromo) {
-    cl_chr_tbl <- empirical_pval_compute_fn(chromo, clusters_folder, clusters_file_suffix, wrapped_features, function_path, hg19_coord, annotation_counts)
+    cl_chr_tbl <- empirical_pval_compute_fn(chromo, clusters_folder, wrapped_features, function_path, hg19_coord, annotation_counts)
     return(cl_chr_tbl)
 })
 

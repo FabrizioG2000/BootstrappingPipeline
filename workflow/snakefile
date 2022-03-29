@@ -38,6 +38,7 @@ rule wrap_clusters:
         "Rscript {input.script} --input {input.raw_folder} --output {output.out_folder}"
 
 annotation_path = "data/feature/annotations.tsv",
+clusters = "data/cluster/wrapped/",
 
 rule compute_pvalue:
     input: 
@@ -45,10 +46,10 @@ rule compute_pvalue:
         clusters = "data/cluster/wrapped/",
         genome = "data/annotation/hg19.genome",
         data = "data/feature/feature_wrapped.Rda",
-   
+
         function_path = "data/annotation/fn_BED/"
     
     output:
         name =  "data/p_val_tbl.Rda"
     shell:
-        "Rscript {input.script} --feature {input.data} --clusters {input.clusters} --annotations {annotation_path} --suffix _wrapped.Rda --genome {input.genome} --function_path {input.function_path} --output {output.name} --workers 3"
+        "Rscript {input.script} --feature {input.data} --clusters {input.clusters} --annotations {annotation_path}  --genome {input.genome} --function_path {input.function_path} --output {output.name} --workers 3"

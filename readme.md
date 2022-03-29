@@ -22,10 +22,10 @@ The script wraps the input data in a *GenomicRange* object to speed up the calcu
 - *data* (*d*): the given feature file. Currently accepts a **Rda** file.
 - *output* (*o*): The path of the output file.
 
-### -> Input Files:
+### Input Files:
 - __feature_in.Rda__: the input data containing the relevant features.
 
-### Output Files ->:
+### Output Files:
 - __features_wrapped.Rda__: The features wrapped in a genomic range.
 
 ## 2. count_annotations.R
@@ -36,10 +36,10 @@ The script counts the number of annotations for each feature type (5'utr, 3'utr,
 - *annotation* (*a*): the path to the folder containing annotations. Currently this folder is expected to contains subfolders for each chromosome.
 - *out* (*o*): The path of the output file.
 
-### -> Inputs:
+### Inputs:
 - __features_wrapped.Rda__: The features wrapped in a GenomicRange object.
 
-### Outputs ->: 
+### Outputs: 
 - __annotations.tsv__: A tsv file containing the number of annotations for each feature type
 
 ## 3. wrap_clusters.R
@@ -48,29 +48,25 @@ The script wraps the cluster data in a *GenomicRange* object to speed up the cal
 ### Inputs:
 - *input* (*i*): The path of the folder containing the cluster data for the chromosomes.
 - *out* (*o*): The path of the output folder.
-- *pattern* (*p*): The naming patter of the input chromosome files. The pattern should contain a single *%* character which will be parsed to the chromosome name. Example: *%_spec_res.Rda* will expect an input in the shape of *chr1_spec_res.Rda*. 
-- *save* (*s*): The naming pattern for the wrapped saved cluster files. Example: a pattern of *%_wrapped.Rda* will save the wrapped data as *chr1_wrapped.Rda*.
 
 ## 4. compute_pvalue.R
 The script computes the p-value of the association between the features and the clusters.
 
-### -> Inputs:
+### Inputs:
 - __features_wrapped.Rda__: The features wrapped in a GenomicRange object.
 - __annotations.tsv__: The number of annotations for each feature type.
-- *clusters*: The clusters wrapped in a GenomicRange object.
+- **clusters**: The clusters wrapped in a GenomicRange object.
 
-### Outputs ->:
+### Outputs:
 - __pvalue.tsv__: The p-value of the association between the features and the clusters.
 
 ### Accepted parameters:
-- *n* (*n*): The number of bootstraps.
+- *bootstrap* (*b*): The number of bootstraps (default is 10).
 - *clusters* (*c*): The Path to the folder containing the clusters wrapped in a GenomicRange object.
 - *features* (*f*): The Path to the file containing the features wrapped in a GenomicRange object.
+- *genome* (*g*): The Path to the genome file.
 - *annotations* (*a*): The Path to the file containing the number of annotations for each feature type.
-- *seed* (*s*): The seed for the random number generator.
-- *out* (*o*): The path of the output file.
-- *verbose* (*v*): If set to **TRUE**, the progress of the computation will be printed.
-- *threads* (*t*): The number of threads to use.
+- *workers* (*w*): The number of workers to use (default is 3).
 
 # File Structure:
 ## Input
