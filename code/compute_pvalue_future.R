@@ -67,6 +67,13 @@ option_list = c(
         c("-b", "--bootstrap"),
         type = "integer", default = 10,
         help = "The number of bootstrap iterations", metavar = "integer"
+    ),
+
+    # The randoms seed
+    make_option(
+        c("-s", "--seed"),
+        type = "integer", default = 1,
+        help = "The random seed for the bootstrapping", metavar = "integer"
     )
 )
 
@@ -81,6 +88,7 @@ out_file <- opt$output
 genome_filepath <- opt$genome
 function_path <- opt$function_path
 boostraps <- opt$bootstrap
+seed <- opt$seed
 
 # the number of workers to dispatch the work on.
 WORKERS_NUM <- opt$workers
@@ -104,7 +112,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
             future::plan(future::multisession, workers = WORKERS_NUM)
             
             # applies from 1 to 100 to
-            rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = T, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
+            rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = seed, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
                 # Try pattern to not abort at the shuffling step
                 ## Sampleing prior to shuffling ensures a greater likelihood of success
                 # 1) Sample n features from the features table.
@@ -123,7 +131,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
             future::plan(future::multisession, workers = WORKERS_NUM)
 
             # Create a list of 100 random situations
-            rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = T, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
+            rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed =seed, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
                 # Try pattern to not abort at the shuffling step
                 ## Sampleing prior to shuffling ensures a greater likelihood of success
                 # 1) Sample n features from the features table.
@@ -155,7 +163,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
     # For example, loop over chr22_inter_no, chr22_inter_no_1, chr22_inter_no_2, ..., chr22_inter_no_10
     # And join the results obtained from sampling one of the 100 available chr22_inter_no features
     future::plan(future::multisession, workers = WORKERS_NUM)
-    rn_peak_coord_tbl_l <- future_lapply(1:bootstrap_count, future.seed = T, future.envir = fn_env, future.packages = c("dplyr"), function(x) {
+    rn_peak_coord_tbl_l <- future_lapply(1:bootstrap_count, future.seed = seed, future.envir = fn_env, future.packages = c("dplyr"), function(x) {
         return(do.call(dplyr::bind_rows, lapply(rn_fn_coord_l, function(f) f[[sample(1:length(f), 1)]])))
     })
     future::plan(future::sequential)

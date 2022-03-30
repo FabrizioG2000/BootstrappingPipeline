@@ -33,6 +33,10 @@ option_list <- list(
     make_option(c("-a", "--annotation"),
         type = "character", default = NULL,
         help = "The path of the annotation folder", metavar = "character"
+    ),
+    make_option(c("-s", "--seed"),
+        type = "integer", default = NULL,
+        help = "The seed for the random number generator", metavar = "integer"
     )
 )
 
@@ -56,6 +60,7 @@ annotate_features <- function(trascription_database, features, function_files) {
     peak_annotations <- suppressMessages(annotatePeak(features, tssRegion = c(-3000, 3000), TxDb = trascription_database, annoDb = "org.Hs.eg.db", verbose = FALSE))
     
     # Random annotations
+    set.seed(seed)
     random_annotation <- ((sample(peak_annotations@annoStat$Feature, size = length(features), prob = peak_annotations@annoStat$Frequency / 100, replace = T)))
 
     # check the number of peaks for each category
@@ -95,6 +100,7 @@ feature_filepath <- opt$input
 wrapped_features <- load_data(feature_filepath)
 annotations_folder <- opt$annotation
 out_file <- opt$output
+seed <- opt$seed
 
 
 # All the counts of the vectors

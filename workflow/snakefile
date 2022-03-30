@@ -24,8 +24,11 @@ rule count_annotations:
         annotation = "data/annotation/fn_BED/"
     output:         
         name = "data/feature/annotations.tsv"
+    
+    params:
+        seed = 12345
     shell:
-        "Rscript {input.script} --input {input.data} --annotation {input.annotation} --output {output.name}"
+        "Rscript {input.script} --input {input.data} --annotation {input.annotation} --output {output.name} --seed {params.seed}"
 
 # Wraps the raw cluster files into genomicranges objects.
 rule wrap_clusters:
@@ -37,19 +40,18 @@ rule wrap_clusters:
     shell:
         "Rscript {input.script} --input {input.raw_folder} --output {output.out_folder}"
 
-annotation_path = "data/feature/annotations.tsv",
-clusters = "data/cluster/wrapped/",
-
 rule compute_pvalue:
     input: 
         script = "code/compute_pvalue_future.R",
         clusters = "data/cluster/wrapped/",
         genome = "data/annotation/hg19.genome",
         data = "data/feature/feature_wrapped.Rda",
-
-        function_path = "data/annotation/fn_BED/"
-    
+        annotation_path = "data/feature/annotations.tsv",
+        clusters = "data/cluster/wrapped/",
+        function_path = "data/annotation/fn_BED/",
+    params:
+        seed = 12345
     output:
         name =  "data/p_val_tbl.Rda"
     shell:
-        "Rscript {input.script} --feature {input.data} --clusters {input.clusters} --annotations {annotation_path}  --genome {input.genome} --function_path {input.function_path} --output {output.name} --workers 3"
+        "Rscript {input.script} --feature {input.data} --clusters {input.clusters} --annotations {input.annotation_path}  --genome {input.genome} --function_path {input.function_path} --output {output.name} --workers 3 --seed {params.seed}"

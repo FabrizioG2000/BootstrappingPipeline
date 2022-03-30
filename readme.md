@@ -19,8 +19,8 @@ This is a pipeline to calculate the p-value of the association between particula
 The script wraps the input data in a *GenomicRange* object to speed up the calculation of intersections on BED files.
 
 ### Accepted Parameters:
-- *data* (*d*): the given feature file. Currently accepts a **Rda** file.
-- *output* (*o*): The path of the output file.
+- *input* (*i*): the given feature file. Currently accepts a **Rda** file.
+- *output* (*o*): The path of the output file saved as an **Rda** file.
 
 ### Input Files:
 - __feature_in.Rda__: the input data containing the relevant features.
@@ -29,12 +29,13 @@ The script wraps the input data in a *GenomicRange* object to speed up the calcu
 - __features_wrapped.Rda__: The features wrapped in a genomic range.
 
 ## 2. count_annotations.R
-The script counts the number of annotations for each feature type (5'utr, 3'utr, exon, intron, intergenic etc).
+The script counts the number of annotations for each feature type (5'utr, 3'utr, exon, intron, intergenic, etc) and outputs a randomized annotation count matrix based on the frequencies of the true counts.
 
 ### Accepted parameters:
-- *data* (*d*): the wrapped features file. Currently accepts a **Rda** file.
+- *input* (*i*): the file containing the features wrapped in a GenomicRange. Currently accepts a **Rda** file.
 - *annotation* (*a*): the path to the folder containing annotations. Currently this folder is expected to contains subfolders for each chromosome.
-- *out* (*o*): The path of the output file.
+- *output* (*o*): The path of the output file.
+- *seed* (*s*): The seed for the randomization.
 
 ### Inputs:
 - __features_wrapped.Rda__: The features wrapped in a GenomicRange object.
@@ -47,10 +48,20 @@ The script wraps the cluster data in a *GenomicRange* object to speed up the cal
 
 ### Inputs:
 - *input* (*i*): The path of the folder containing the cluster data for the chromosomes.
-- *out* (*o*): The path of the output folder.
+- *output* (*o*): The path of the output folder.
 
 ## 4. compute_pvalue.R
 The script computes the p-value of the association between the features and the clusters.
+
+### Accepted parameters:
+- *bootstrap* (*b*): The number of bootstraps (default is 10).
+- *clusters* (*c*): The path to the folder containing the clusters wrapped in a *GenomicRange* object.
+- *features* (*f*): The path to the file containing the features wrapped in a *GenomicRange* object.
+- *genome* (*g*): The path to the genome file (containing lenghts for the required chromosomes).
+- *annotations* (*a*): The Path to the file containing the number of annotations for each feature type.
+- *workers* (*w*): The number of workers to use (default is 3).
+- *output* (*o*): The path of the output file.
+- *seed* (*s*): The seed for the random number generator (default is 12345).
 
 ### Inputs:
 - __features_wrapped.Rda__: The features wrapped in a GenomicRange object.
@@ -59,14 +70,6 @@ The script computes the p-value of the association between the features and the 
 
 ### Outputs:
 - __pvalue.tsv__: The p-value of the association between the features and the clusters.
-
-### Accepted parameters:
-- *bootstrap* (*b*): The number of bootstraps (default is 10).
-- *clusters* (*c*): The Path to the folder containing the clusters wrapped in a GenomicRange object.
-- *features* (*f*): The Path to the file containing the features wrapped in a GenomicRange object.
-- *genome* (*g*): The Path to the genome file.
-- *annotations* (*a*): The Path to the file containing the number of annotations for each feature type.
-- *workers* (*w*): The number of workers to use (default is 3).
 
 # File Structure:
 ## Input
