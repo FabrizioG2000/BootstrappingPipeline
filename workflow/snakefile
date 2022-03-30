@@ -47,7 +47,6 @@ rule compute_pvalue:
         genome = "data/annotation/hg19.genome",
         data = "data/feature/feature_wrapped.Rda",
         annotation_path = "data/feature/annotations.tsv",
-        clusters = "data/cluster/wrapped/",
         function_path = "data/annotation/fn_BED/",
     params:
         seed = 12345
