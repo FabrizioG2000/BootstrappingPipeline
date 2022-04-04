@@ -79,13 +79,13 @@ The pipeline expects a folder structure like this:
 
 ## Intermediate Files
 The pipeline creates a folder structure like this:
-- data/features/[cell line]/[feature type]_wrapped.Rda (the features wrapped into a GRange object)
-- data/clusters/[cell line]/[cluster type]/[chromosome]_wrapped.Rda (the clusters wrapped into a GRange object)
-- data/features/[cell line]/annotations.Rda (the annotations for each feature type)
+- data/tmp/wrapped_features/[cell line]/[feature type]/feature_wrapped.Rda (the features wrapped into a GRange object)
+- data/tmp/wrapped_clusters/[cell line]/[chromosome]_wrapped.Rda (the clusters wrapped into a GRange object)
+- data/tmp/annotation_counts/[cell line]/[feature type]/counts.tsv (the annotations for each feature type)
 
 # Output
 Finally the pipeline creates an output file in the following format:
-- data/output/[cell line].[feature type]_[cluster type]_[chromosome].Rda (the output file)
+- data/pvalues/[cell_line].[feature_type].tsv
 
 # Conventions
 In the naming of the parameters the following conventions are used:

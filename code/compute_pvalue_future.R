@@ -7,7 +7,7 @@ suppressMessages(library(future))
 suppressMessages(library(future.apply))
 library(optparse)
 
-print("Imported required Libraries.")
+message("Imported required Libraries.")
 
 source("code/common.R")
 
@@ -18,13 +18,14 @@ res_num <- c(1e6, 5e5, 1e5, 5e4, 1e4, 5e3)
 names(res_num) <- res_set
 
 # the parameters which will be updated to work with optparse
-clusters_folder <- "./data/cluster/wrapped/"
-annotations_counts_path <- "./data/feature/annotations.tsv"
-clusters_file_suffix <- "_wrapped.Rda"
-feature_file <- "./data/feature/feature_wrapped.Rda"
+clusters_folder <- "./data/tmp/wrapped_clusters/HMEC/"
+annotations_counts_path <- "./data/tmp/annotation_counts/HMEC/CAGE/counts.tsv"
+feature_file <- "./data/tmp/wrapped_features/HMEC/CAGE/feature_in.Rda"
 out_file <- "./data/pval_tbl.Rda"
 genome_filepath <- "./data/annotation/hg19.genome"
 function_path <- "./data/annotation/fn_BED/"
+WORKERS_NUM = 3
+seed = 1234
 
 option_list = c(
     make_option(c("-d", "--clusters"),
@@ -334,6 +335,8 @@ hg19_coord <- read_delim(genome_filepath,
 names(hg19_coord) <- c("chrom", "size")
 
 chr_set <- list.files(function_path)
+# chr_set <- c("chr22")
+
 annotation_counts <- read.csv(annotations_counts_path, header = T, stringsAsFactors = F, sep = "\t")
 
 # Computing the p-values for all the chromosomes.
@@ -349,4 +352,4 @@ cl_chr_emp_pval_tbl <- do.call(bind_rows, cl_chr_emp_pval_l)
 cl_chr_emp_pval_tbl <- cl_chr_emp_pval_tbl %>%
     dplyr::select(chr, cl, feature_n, emp.pval)
 
-write.table(cl_chr_emp_pval_tbl, file = paste0("./data/", "p_value_table.tsv"), sep = "\t", row.names = F, col.names = T)
+write.table(cl_chr_emp_pval_tbl, file = out_file, sep = "\t", row.names = F, col.names = T)

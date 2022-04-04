@@ -12,6 +12,14 @@ option_list <- list(
   make_option(c("-o", "--output"),
     type = "character",
     help = "The output directory"
+  ),
+  # The cell line
+  make_option(c("-l", "--line"),
+    type = "character",
+    help = "The cell line to use"
+  ),
+  make_option(c("-p", "--progress"), default =  FALSE,
+    help = "Show progress (Showing it will block parallelism)"
   )
 )
 
@@ -29,11 +37,13 @@ if (!file.exists(opt$input)) {
   dir.create(opt$input)
 }
 
+
 # Getting the parameters
 input_directory <- "data/cluster/raw"
 output_directory <- "data/cluster/wrapped"
 input_directory <- opt$input
 output_directory <- opt$output
+progress <- opt$progress
 
 # The input filename
 suppressMessages(library(crayon))
@@ -50,6 +60,10 @@ has_progress <- TRUE
 tryCatch(library(progress), error = function(e) {
   has_progress <- FALSE
 })
+
+# Show the progress only if it is requested
+has_progress = has_progress && progress
+
 library(stringr)
 options(scipen = 999999999)
 
@@ -100,7 +114,7 @@ for (file in list.files(input_directory)) {
     pb <- progress_bar$new(format = "  wrapping [:bar] :percent eta: :eta", clear = FALSE, total = nrow(chr_cl_tbl) + 1)
     pb$tick(0)
 
-    chr_cl_tbl <- chr_cl_tbl %>% mutate(GRange2 = pmap(list(chr, bins, res), function(chr, bins, res) {
+    chr_cl_tbl <- chr_cl_tbl %>% mutate(GRange = pmap(list(chr, bins, res), function(chr, bins, res) {
       pb$tick()
 
       return(GRanges(
@@ -112,9 +126,8 @@ for (file in list.files(input_directory)) {
       ))
     }))
   } else {
-    chr_cl_tbl <- chr_cl_tbl %>% mutate(GRange2 = future_pmap(list(chr, bins, res), function(chr, bins, res) {
-    
-
+    message("(Running in Parallel)")
+    chr_cl_tbl <- chr_cl_tbl %>% mutate(GRange = future_pmap(list(chr, bins, res), function(chr, bins, res) {
       return(GRanges(
         seqnames = chr,
         ranges = IRanges(
@@ -132,4 +145,4 @@ for (file in list.files(input_directory)) {
   message((paste0("Saved ", green(chromo), " to ", output_file)))
 }
 
-# plan(sequential)
+if(!has_progress) plan(sequential)

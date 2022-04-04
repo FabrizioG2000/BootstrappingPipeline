@@ -15,7 +15,20 @@ option_list <- list(
     make_option(c("-o", "--output"),
         type = "character", default = NULL,
         help = "The output file name. The path is relative to the directory of the input. [Required]", metavar = "character"
+    ),
+    
+    # the cell line
+    make_option(c("-c", "--line"),
+        type = "character", default = NULL,
+        help = "The cell line to use. [Required]", metavar = "character"
+    ),
+
+    # the feature type
+    make_option(c("-f", "--feature"),
+        type = "character", default = NULL,
+        help = "The feature type to use. [Required]", metavar = "character"
     )
+
 )
 
 # The argument parser
@@ -27,9 +40,15 @@ if (is.null(opt$data) | is.null(opt$output)) {
     stop("Please specify an input and an output file.")
 }
 
+# and that the cell line and feature type have been passed
+if (is.null(opt$line) | is.null(opt$feature)) {
+    stop("Please specify a cell line and a feature type!")
+}
+
 # The input file name
 suppressMessages(library(crayon))
-message(blue("Started Execution of R Script."))
+message(blue("Started Execution of R Scrip : wrap_features.R"))
+
 
 # If no errors are found in the input parameters, proceed with the script.
 suppressMessages(library(tidyverse))
