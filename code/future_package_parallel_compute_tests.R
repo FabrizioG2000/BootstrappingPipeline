@@ -12,6 +12,7 @@ options(scipen = 999999999)
 res_set <- c("1Mb", "500kb", "100kb", "50kb", "10kb", "5kb")
 res_num <- c(1e6, 5e5, 1e5, 5e4, 1e4, 5e3)
 names(res_num) <- res_set
+
 #-----------------------------------------
 # Utils. Fn
 data_in_fn <- function(file) {

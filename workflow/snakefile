@@ -1,5 +1,32 @@
 import os
 
+# the specification of the provided features.
+specs = glob_wildcards("data/features/{cell_line}/{feature_type}/{file_name}.Rda")
+
+CELL_LINES = specs.cell_line
+FEATURE_TYPES = specs.feature_type
+FILE_NAMES = specs.file_name
+
+WRAP_TASKS = list(zip(CELL_LINES, FEATURE_TYPES, FILE_NAMES))
+
+# The specificaiton provided by the clusters:
+CLUSTER_SPECS = glob_wildcards("data/clusters/{cell_line}/{cluster_file_name}.Rda")
+
+# This are the cell lines detected from the file names.
+CLUS_CELL_LINES = CLUSTER_SPECS.cell_line
+
+
+def green(text:str) -> str:
+    return f"\033[32m{text}\033[0m"
+
+def yellow(text:str) -> str:
+    return f"\033[33m{text}\033[0m"
+
+def red(text:str) -> str:
+    return f"\033[31m{text}\033[0m"
+
+
+
 # Wraps the given features into a GenomicRange object to speed up further computations
 rule wrap_features:
     input:
@@ -7,12 +34,26 @@ rule wrap_features:
         script = "code/wrap_features.R",
 
         # The features to wrap in a GenomicRange object
-        data   = "data/feature/feature_in.Rda"
-    output:
-        name = "data/feature/feature_wrapped.Rda"
+        data = [
+            f"data/features/{cell_line}/{feature_type}/{file_name}.Rda"
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
 
-    shell:
-        "Rscript {input.script} --data {input.data} --output {output.name}"
+    benchmark:
+        "benchmarks/wrap_features.tsv"
+
+    output:
+        name = [
+            temp(f"data/tmp/wrapped_features/{cell_line}/{feature_type}/{file_name}.Rda")
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
+    run:
+        for cell_line, feature_type, file_name in WRAP_TASKS:
+            input_file = f"data/features/{cell_line}/{feature_type}/{file_name}.Rda"
+            output_file = f"data/tmp/wrapped_features/{cell_line}/{feature_type}/{file_name}.Rda"
+
+            print("Wrapping Features for Cell Line:", yellow(cell_line), "Feature Type:", yellow(feature_type))
+            shell("Rscript {input.script}" + f" --data {input_file} --output {output_file} --line {cell_line} --feature {feature_type}")
 
 # Counts the number of features for each annotation category.
 rule count_annotations:
@@ -20,37 +61,89 @@ rule count_annotations:
         script = "code/count_annotations.R",
 
         # The wrapped features to count the annotation one.
-        data = "data/feature/feature_wrapped.Rda",
-        annotation = "data/annotation/fn_BED/"
+        data = [
+            f"data/tmp/wrapped_features/{cell_line}/{feature_type}/{file_name}.Rda"
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
+        annotation_data = "data/annotation/fn_BED/"
+
     output:         
-        name = "data/feature/annotations.tsv"
-    
+        name =[
+            temp(f"data/tmp/annotation_counts/{cell_line}/{feature_type}/counts.tsv")
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
+    benchmark:
+        "benchmarks/count_annotations.tsv"
     params:
+        # The seed for the random number generator.
         seed = 12345
-    shell:
-        "Rscript {input.script} --input {input.data} --annotation {input.annotation} --output {output.name} --seed {params.seed}"
+    run:
+        for cell_line, feature_type, file_name in WRAP_TASKS:
+            input_file = f"data/tmp/wrapped_features/{cell_line}/{feature_type}/{file_name}.Rda"
+            output_file = f"data/tmp/annotation_counts/{cell_line}/{feature_type}/counts.tsv"
+
+            print("Counting Annotations for Cell Line:", yellow(cell_line), "Feature Type:", yellow(feature_type))
+            
+            shell("Rscript {input.script}" + f" --input {input_file} --output {output_file} --annotation {input.annotation_data} --seed {params.seed}")
 
 # Wraps the raw cluster files into genomicranges objects.
 rule wrap_clusters:
     input:
+        #The script 
         script = "code/wrap_clusters.R",
-        raw_folder = "data/cluster/raw/"
+        raw_folder = [f"data/clusters/{cell_line}/" for cell_line in CLUS_CELL_LINES],
     output:
-        out_folder = directory("data/cluster/wrapped/")
-    shell:
-        "Rscript {input.script} --input {input.raw_folder} --output {output.out_folder}"
+        out_folder =  [temp(directory(f"data/tmp/wrapped_clusters/{cell_line}/") for cell_line in CLUS_CELL_LINES)],
+    params:
+        # Whether to show progress.
+        show_progress = True,
+    
+    benchmark:
+        "benchmarks/wrap_clusters.tsv"
+    run:
+
+        for cell_line in CLUS_CELL_LINES:
+            input_folder = f"data/clusters/{cell_line}/"
+            output_folder = f"data/tmp/wrapped_clusters/{cell_line}/"
+
+            print("Wrapping Clusters for Cell Line:", yellow(cell_line))
+            shell("Rscript {input.script}" + f" --input {input_folder} --output {output_folder} --line {cell_line}" +( "--progress" if params.show_progress else ""))
+
 
 rule compute_pvalue:
     input: 
+        # The script
         script = "code/compute_pvalue_future.R",
-        clusters = "data/cluster/wrapped/",
+        wrapped_clusters = [((f"data/tmp/wrapped_clusters/{cell_line}/") for cell_line in CLUS_CELL_LINES)],
         genome = "data/annotation/hg19.genome",
-        data = "data/feature/feature_wrapped.Rda",
-        annotation_path = "data/feature/annotations.tsv",
+        wrapped_features = [
+            f"data/tmp/wrapped_features/{cell_line}/{feature_type}/{file_name}.Rda"
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
+        annotations = [
+            f"data/tmp/annotation_counts/{cell_line}/{feature_type}/counts.tsv"
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
         function_path = "data/annotation/fn_BED/",
     params:
         seed = 12345
     output:
-        name =  "data/p_val_tbl.Rda"
-    shell:
-        "Rscript {input.script} --feature {input.data} --clusters {input.clusters} --annotations {input.annotation_path}  --genome {input.genome} --function_path {input.function_path} --output {output.name} --workers 3 --seed {params.seed}"
+        name =  [
+            (f"data/pvalues/{cell_line}.{feature_type}.tsv")
+            for cell_line, feature_type, file_name in WRAP_TASKS
+        ],
+
+    benchmark:
+        "benchmarks/compute_pvalue.tsv"
+
+    run:
+        for cell_line, feature_type, file_name in WRAP_TASKS:
+            feature_input_file = f"data/tmp/wrapped_features/{cell_line}/{feature_type}/{file_name}.Rda"
+            cluster_input_folder = f"data/tmp/wrapped_clusters/{cell_line}/"
+
+            annotation_input_file = f"data/tmp/annotation_counts/{cell_line}/{feature_type}/counts.tsv"
+
+            out_file = f"data/pvalues/{cell_line}.{feature_type}.tsv"
+
+            print("Computing P-Values for Cell Line:", yellow(cell_line), "Feature Type:", yellow(feature_type))
+            shell("Rscript {input.script} --function_path {input.function_path} --genome {input.genome} --seed {params.seed}" + f" --annotations {annotation_input_file} --feature {feature_input_file} --clusters {cluster_input_folder}  --workers 3 --output {out_file}")
