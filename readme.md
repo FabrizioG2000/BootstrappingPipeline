@@ -32,7 +32,7 @@ The script wraps the input data in a *GenomicRange* object to speed up the calcu
 The script counts the number of annotations for each feature type (5'utr, 3'utr, exon, intron, intergenic, etc) and outputs a randomized annotation count matrix based on the frequencies of the true counts.
 
 ### Accepted parameters:
-- *input* (*i*): the file containing the features wrapped in a GenomicRange. Currently accepts a **Rda** file.
+- *input* (*i*): the file containing the features wrapped in a GenomicRange. Currently accepts a **BED** and **Rda** files.
 - *annotation* (*a*): the path to the folder containing annotations. Currently this folder is expected to contains subfolders for each chromosome.
 - *output* (*o*): The path of the output file.
 - *seed* (*s*): The seed for the randomization.
@@ -83,7 +83,7 @@ The pipeline creates a folder structure like this:
 - data/tmp/wrapped_clusters/[cell line]/[chromosome]_wrapped.Rda (the clusters wrapped into a GRange object)
 - data/tmp/annotation_counts/[cell line]/[feature type]/counts.tsv (the annotations for each feature type)
 
-# Output
+## Output
 Finally the pipeline creates an output file in the following format:
 - data/pvalues/[cell_line].[feature_type].tsv
 
