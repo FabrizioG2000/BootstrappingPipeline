@@ -7,8 +7,7 @@ suppressMessages(library(future))
 suppressMessages(library(future.apply))
 library(optparse)
 
-message("Imported required Libraries.")
-
+# For the load_data function
 source("code/common.R")
 
 # R-Specific stuff
@@ -20,19 +19,19 @@ names(res_num) <- res_set
 # the parameters which will be updated to work with optparse
 clusters_folder <- "./data/tmp/wrapped_clusters/HMEC/"
 annotations_counts_path <- "./data/tmp/annotation_counts/HMEC/CAGE/counts.tsv"
-feature_file <- "./data/tmp/wrapped_features/HMEC/CAGE/feature_in.Rda"
+feature_file <- "./data/tmp/wrapped_features/HMEC/CAGE/features.Rda"
 out_file <- "./data/pval_tbl.Rda"
 genome_filepath <- "./data/annotation/hg19.genome"
 function_path <- "./data/annotation/fn_BED/"
-WORKERS_NUM = 3
-seed = 1234
+WORKERS_NUM <- 3
+seed <- 1234
+bootstraps = 10
 
-option_list = c(
+option_list <- c(
     make_option(c("-d", "--clusters"),
         type = "character", default = NULL,
         help = "The folder containing the clusters", metavar = "character"
     ),
-
     make_option(
         c("-a", "--annotations"),
         type = "character", default = NULL,
@@ -63,33 +62,42 @@ option_list = c(
         type = "integer", default = 3,
         help = "The number of workers to dispatch the work on", metavar = "integer"
     ),
-    #The bootstrap count
+
+    # The bootstrap count.
     make_option(
-        c("-b", "--bootstrap"),
+        c("-b", "--bootstraps"),
         type = "integer", default = 10,
         help = "The number of bootstrap iterations", metavar = "integer"
     ),
 
-    # The randoms seed
+    # The randoms seed.
     make_option(
         c("-s", "--seed"),
         type = "integer", default = 1,
         help = "The random seed for the bootstrapping", metavar = "integer"
+    ),
+
+    # The chromosomes.
+    make_option(
+        c("-c", "--chromosomes"),
+        type = "character", default = NULL,
+        help = "The chromosomes to process", metavar = "character"
     )
 )
 
 # Creating the options to parse the arguments
 opt <- parse_args(OptionParser(option_list = option_list))
 
-# Parsing the arguments from the console 
+# Parsing the arguments from the console
 clusters_folder <- opt$clusters
 annotations_counts_path <- opt$annotations
 feature_file <- opt$feature
 out_file <- opt$output
 genome_filepath <- opt$genome
 function_path <- opt$function_path
-boostraps <- opt$bootstrap
+bootstraps <- opt$bootstraps
 seed <- opt$seed
+chromosomes <- opt$chromosomes
 
 # the number of workers to dispatch the work on.
 WORKERS_NUM <- opt$workers
@@ -111,7 +119,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
 
         if (f == fn_file[5]) {
             future::plan(future::multisession, workers = WORKERS_NUM)
-            
+
             # applies from 1 to 100 to
             rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = seed, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
                 # Try pattern to not abort at the shuffling step
@@ -132,7 +140,7 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
             future::plan(future::multisession, workers = WORKERS_NUM)
 
             # Create a list of 100 random situations
-            rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed =seed, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
+            rn_fn_coord_l[[f]] <- future_lapply(1:100, future.seed = seed, future.packages = c("dplyr", "valr"), future.envir = fn_env, function(x) {
                 # Try pattern to not abort at the shuffling step
                 ## Sampleing prior to shuffling ensures a greater likelihood of success
                 # 1) Sample n features from the features table.
@@ -151,13 +159,13 @@ rn_wrapped_features_build_fn <- function(chromo_counts, fn_bed_l, hg19_coord, tm
             rn_fn_coord_l[[f]] <- rn_fn_coord_l[[f]][!(unlist(lapply(rn_fn_coord_l[[f]], function(x) any(class(x) %in% "try-error"))))]
         }
 
-        cat("-\t Finished shuffling ", crayon::blue(f), " features", "\n")
+        cat("\t\t-Shuffled ", crayon::blue(f), " features", "\n")
     }
 
     warnings()
 
     # Assemble these blocks into n rnadom results
-    bootstrap_count <- boostraps
+    bootstrap_count <- bootstraps
 
     # Create 10 random results by:
     # looping over 10 and joining the results from the random sampling of one of the features.
@@ -207,7 +215,7 @@ empirical_pval_compute_fn <- function(chromo, clusters_folder, wrapped_features,
     chr_wrapped_features <- wrapped_features[seqnames(wrapped_features) == chromo]
 
     # Logging the start of the bootstrappinf
-    cat("Started bootstrapping for chromosome ", crayon::green(chromo), "\n")
+    cat("\tBootstrapping for chromosome ", crayon::green(chromo), "\n")
 
     # The folder containing the annotations about this chromosome: "../data/annotation/fn_BED/chr1/"
     fn_folder <- paste0(function_path, chromo, "/")
@@ -226,10 +234,10 @@ empirical_pval_compute_fn <- function(chromo, clusters_folder, wrapped_features,
 
     # Select the row where chromosome is chromo
     chromo_counts <- annotation_counts[annotation_counts$chr == chromo, ]
-    
+
     # Keep only the element starting from the second one (remove chr)
     chromo_counts <- chromo_counts[, 2:ncol(chromo_counts)]
-    
+
     # Replace X with chromo in the names of chromo_counts (for some reason while importing the column names)
     # switch from utr3.BED to chr1_utr3.BED
     names(chromo_counts) <- gsub("j", paste0(chromo, "_"), names(chromo_counts))
@@ -243,14 +251,15 @@ empirical_pval_compute_fn <- function(chromo, clusters_folder, wrapped_features,
             break
         }
     }
-    if(is.na(clusters_file)) {
-        stop("No clusters file found for chromosome ", chromo)
+    if (is.na(clusters_file)) {
+        cat("\tNo clusters file found for chromosome ", red(chromo), "in ", yellow(clusters_folder), ", Skipping it!\n")
+        return(NA)
     }
 
-    cl_chr_tbl <- load_data(paste0(clusters_folder,"/", clusters_file))
+    cl_chr_tbl <- load_data(paste0(clusters_folder, "/", clusters_file))
 
     # Logging that the counting of the observed overlaps has started.
-    cat("Started counting observed overlaps for chromosome ", crayon::green(chromo), "\n")
+    cat("\tCunting observed overlaps for chromosome ", crayon::green(chromo), "\n")
 
     # table collecting the observed CAGE-peak coordinates
     # counting the number of overlaps between the features and the clusters
@@ -281,13 +290,13 @@ empirical_pval_compute_fn <- function(chromo, clusters_folder, wrapped_features,
         dplyr::rename(chrom = seqnames)
 
     # Logging that the generation of the random features
-    cat("Started generating random features for chromosome ", crayon::green(chromo), "\n")
+    cat("\tGenerating random features for chromosome ", crayon::green(chromo), "\n")
 
     # Building the effective random coordinates on which the p-value will be computed
     rn_Grange_l <- rn_wrapped_features_build_fn(chromo_counts, fn_bed_l, hg19_coord, tmp_cage_tbl, fn_file)
 
     # Logging the started of the p-value computation
-    cat("Started computing p-values for chromosome ", crayon::green(chromo), "\n")
+    cat("\tComputing p-values for chromosome ", crayon::green(chromo), "\n")
 
     # counting the overlaps between the clusters and the newly created random features
     # The resulting vector will be a list of 10 (number of bootstrap) lists of overlaps count for each cluster.
@@ -334,9 +343,21 @@ hg19_coord <- read_delim(genome_filepath,
 )
 names(hg19_coord) <- c("chrom", "size")
 
-chr_set <- list.files(function_path)
-# chr_set <- c("chr22")
+# If we provided a list of chromosomes to liimit the choice to, we do it
+if (!is.null(chromosomes)) {
 
+    #The chromosome list is expected in the form chr1, chr2, chr3, ...
+    chr_set <- strsplit(chromosomes, ",")[[1]]
+} else {
+
+    # Otherwise just list the folders in the function directory
+    chr_set <- list.files(function_path)
+}
+
+# Log the chromosomes for which we will compute the p-values
+cat("\tChromosomes to compute p-values on: ", chr_set, "\n")
+
+# Getting the annotation counts form the annotation file
 annotation_counts <- read.csv(annotations_counts_path, header = T, stringsAsFactors = F, sep = "\t")
 
 # Computing the p-values for all the chromosomes.
@@ -345,11 +366,20 @@ cl_chr_emp_pval_l <- lapply(chr_set, function(chromo) {
     return(cl_chr_tbl)
 })
 
+# Remove the elements which are NAs (NAs can be produced at just one step right now which is the user is trying to comput the p-value on a chromosome
+# for which there is no data available).
+cl_chr_emp_pval_l <- cl_chr_emp_pval_l[!is.na(cl_chr_emp_pval_l)]
+
+# Print the number of chromosomes which have been removed.
+cat("\tNumber of chromosomes removed: ", nrow(cl_chr_emp_pval_l) - nrow(chr_set), "\n")
+
+# "Stack" the dataframe one on top of each other.
 cl_chr_emp_pval_tbl <- do.call(bind_rows, cl_chr_emp_pval_l)
 
-#Save the table as a tsv
+# Save the table as a tsv
 # Drop the GRange and bins columns
 cl_chr_emp_pval_tbl <- cl_chr_emp_pval_tbl %>%
     dplyr::select(chr, cl, feature_n, emp.pval)
 
+# Save the Dataframe to a table.
 write.table(cl_chr_emp_pval_tbl, file = out_file, sep = "\t", row.names = F, col.names = T)

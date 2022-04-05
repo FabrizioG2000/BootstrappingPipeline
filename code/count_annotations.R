@@ -1,5 +1,5 @@
 suppressMessages(library(crayon))
-message(blue("Started Execution of R Script."))
+message("\tImporting libraries: ",  yellow("..."))
 
 # Counts the annotations for each feature type for each feature.
 suppressMessages(library(TxDb.Hsapiens.UCSC.hg19.knownGene))
@@ -7,8 +7,7 @@ suppressMessages(library(ChIPseeker))
 suppressMessages(library(valr))
 suppressMessages(library(GenomicRanges))
 source("code/common.R")
-
-message(blue("Imported required libraries"))
+message("\tImporting libraries: ",  green("Done"))
 
 
 # Uses the optparse library to gather the following information:
@@ -112,8 +111,6 @@ trascription_database <- TxDb.Hsapiens.UCSC.hg19.knownGene
 # the available list of chromosomes
 chromosome_list <- list.files(annotations_folder)
 
-chromo <- "chr22"
-
 # Iterate over the chromosomes
 for (chromo in chromosome_list) {
 
@@ -141,7 +138,7 @@ for (chromo in chromosome_list) {
     seqlevels(chromosome_txdb) <- chromo
 
     # Logging the start of functional annotation
-    cat("Annotating features for chromosome: ", green(chromo), "...\n", sep = "")
+    cat("\tAnnotating chromosome: ", green(chromo), "\n", sep = "")
 
     # The number of annotations for each feature type
     count_vector <- annotate_features(chromosome_txdb, features, function_files)

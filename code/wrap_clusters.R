@@ -34,7 +34,7 @@ if (is.null(opt$input) || is.null(opt$output)) {
 
 # Make the directory if it does not exist
 if (!file.exists(opt$input)) {
-  dir.create(opt$input)
+  dir.create(opt$input, showWarnings = F)
 }
 
 
@@ -47,13 +47,14 @@ progress <- opt$progress
 
 # The input filename
 suppressMessages(library(crayon))
-message(blue("Started Execution of R Script."))
+message("\tImporting libraries: ",  yellow("..."))
 
 # Produce Coordinate tables for BHiCect clusters
 suppressMessages(library(tidyverse))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(furrr))
 suppressMessages(library(crayon))
+message("\tImporting libraries: ",  green("Done"))
 
 has_progress <- TRUE
 # Try to import the library progress
@@ -74,10 +75,10 @@ names(res_num) <- res_set
 
 
 # Planning the execution on 3 worker sessions
-
 if (!has_progress) plan(multisession, workers = 3)
 
 file <- list.files(input_directory)[[1]]
+
 # Looping over the chromosomes
 for (file in list.files(input_directory)) {
 
@@ -107,7 +108,7 @@ for (file in list.files(input_directory)) {
   }))
 
   # Adding a GRange object to the table
-  cat(paste0("Adding GRange objects to the table for chromosome ", blue(chromo), "\n"))
+  cat(paste0("\tChromosome: ", blue(chromo), "\n"))
 
   # If the user has the library progress, print the progress bar, otherwise use the future package and do not print the progress.
   if (has_progress) {
@@ -126,7 +127,7 @@ for (file in list.files(input_directory)) {
       ))
     }))
   } else {
-    message("(Running in Parallel)")
+    #cat("\t(Running in Parallel)", "\n")
     chr_cl_tbl <- chr_cl_tbl %>% mutate(GRange = future_pmap(list(chr, bins, res), function(chr, bins, res) {
       return(GRanges(
         seqnames = chr,
@@ -140,9 +141,6 @@ for (file in list.files(input_directory)) {
 
   # Saving the file to disk
   save(chr_cl_tbl, file = output_file)
-
-  # Log the chromosome name and the saving path to console
-  message((paste0("Saved ", green(chromo), " to ", output_file)))
 }
 
 if(!has_progress) plan(sequential)
